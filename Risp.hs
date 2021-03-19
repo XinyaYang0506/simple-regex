@@ -8,6 +8,7 @@ import Control.Monad.Except
 
 import System.Environment
 import System.IO
+import Data.List
 
 data Risp = CharSet (Set Char)
     | Func [Risp]
@@ -74,6 +75,7 @@ showVal (CharSet set) = "[" ++ show set ++ "]"
 showVal (Atom name) = name
 showVal (Number number) = show number
 showVal (Func list) = "(" ++ unwordsList list ++ ")"
+showVal (RegExp str) = show str
 
 ------------- Error --------------
 data RispError = NumArgs Integer [Risp]
@@ -113,29 +115,30 @@ eval (Func ((Atom funcName): args)) =
         listOfEvaledArgs <- mapM eval args
         return $ Func (Atom funcName: listOfEvaledArgs)
 eval (Func (wrongHead : _)) = throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
-eval (RegExp regExp) = throwError $ TypeMismatch "not regExp" regExp
+eval val@(RegExp regExp) = throwError $ TypeMismatch "not regExp" val
 eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
 translate :: Risp -> ThrowsError Risp
-translate (Number num) = throwError $ TypeMismatch "not number" atom
-translate (CharSet charSet) = return $ RegExp $ '[' ++ toAscList charSet ++ ']' -- TODO: add escape characters
-translate (Atom atom) = throwError $ TypeMismatch "not atom" atom
+translate val@(Number num) = throwError $ TypeMismatch "not number" val
+translate (CharSet charSet) = return $ RegExp $ "[" ++ toAscList charSet ++ "]" -- TODO: add escape characters
+translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
 translate (Func ((Atom "concat") : args)) =
     do
         listOfTranslatedArgs <- mapM translate args
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
-        let concatedString = foldl ++ listOfRegExp
-        return $ RegExp $ '(' ++ concatedString ++ ')'
+        let concatedString = concat listOfRegExp
+        return $ RegExp $ "(" ++ concatedString ++ ")"
 translate (Func [Atom "repeatRange", pattrn, Number min, Number max]) =
     do
-        translatedPattern <- extractRegExp $ translate pattrn
-        return $ RegExp '(' ++ translatedPattern ++ '{' ++ show min ++ ',' ++ show max ++ '}' ++ ')'
-translate (Func [(Atom "or") : args]) =
+        translatedPattern <- translate pattrn
+        translatedString <- extractRegExp translatedPattern
+        return $ RegExp $ "(" ++ translatedString ++ "{" ++ show min ++ "," ++ show max ++ "}" ++ ")"
+translate (Func ((Atom "or") : args)) =
     do
         listOfTranslatedArgs <- mapM translate args
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
-        return $ RegExp $ '(' ++ intercalate '|' listOfRegExp ++ ')'
+        return $ RegExp $ "(" ++ intercalate "|" listOfRegExp ++ ")"
 
 -- translate obj = return obj
 
@@ -149,10 +152,6 @@ extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
 
-
-
--- translate  charset -> '[' + print every char in charset + ']'
-
 ----------- MAIN ---------------
 readExpr :: String -> ThrowsError Risp
 readExpr input = case parse parseExpr "risp" input of
@@ -165,6 +164,6 @@ trapError action = catchError action (return . show)
 main :: IO ()
 main = do
      args <- getArgs
-     let evaled = fmap show $ readExpr (args !! 1) >>= eval
+     let evaled = fmap show $ readExpr (head args) >>= eval >>= translate
      putStrLn $ extractValue $ trapError evaled
 
