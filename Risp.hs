@@ -1,20 +1,33 @@
 {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 import Data.Set hiding (foldl)
 import Text.ParserCombinators.Parsec
 import Control.Monad.Except
-
+import Data.Data
+import Data.Typeable
 
 import System.Environment
 import System.IO
 import Data.List
 
+data Anchor = StartOfLine | EndOfLine | WordBoundary deriving (Typeable, Data)
 data Risp = CharSet (Set Char)
     | Func [Risp]
     | Atom String
     | Number Integer
     | RegExp String
+    | Anchor Anchor
+
+parseAnchor :: Parser Risp
+parseAnchor = do
+    char '@'
+    x <- try (string "StartOfLine") <|> try (string "EndOfLine") <|> try (string "WordBoundary")
+    return $ Anchor case x of
+        "StartOfLine" -> StartOfLine
+        "EndOfLine" -> EndOfLine
+        "WordBoundary" -> WordBoundary
 
 parseNumber :: Parser Risp
 parseNumber = Number . read <$> many digit
@@ -58,11 +71,11 @@ parseFunc =
         end = skipMany space >> char ')'
 
 parseExpr :: Parser Risp
-parseExpr = parseFunc
+parseExpr = parseAnchor
+    <|> parseFunc
     <|> parseAtom
     <|> parseChar
     <|> parseNumber
-    -- <|> 
 
 
 -------------- show------------------
@@ -71,6 +84,7 @@ unwordsList = unwords . Prelude.map showVal
 instance Show Risp where show = showVal
 
 showVal :: Risp -> String
+showVal (Anchor anchor) = "@" ++ (showConstr . toConstr) anchor
 showVal (CharSet set) = "[" ++ show set ++ "]"
 showVal (Atom name) = name
 showVal (Number number) = show number
@@ -120,6 +134,9 @@ eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
 translate :: Risp -> ThrowsError Risp
+translate (Anchor StartOfLine) = return $ RegExp "^"
+translate (Anchor EndOfLine) = return $ RegExp "$"
+translate (Anchor WordBoundary) = return $ RegExp "\\b"
 translate val@(Number num) = throwError $ TypeMismatch "not number" val
 translate (CharSet charSet) = return $ RegExp $ "[" ++ toAscList charSet ++ "]" -- TODO: add escape characters
 translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
