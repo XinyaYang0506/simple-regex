@@ -2,15 +2,19 @@
 {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 import Data.Set hiding (foldl)
-import Text.ParserCombinators.Parsec
+import Text.ParserCombinators.Parsec hiding (State)
 import Control.Monad.Except
 import Data.Data
 import Data.Typeable
+import Data.Maybe
 
 import System.Environment
 import System.IO
 import Data.List
+import Control.Monad.State
+-- import Extra.Control.Monad.Extra
 
 data Anchor = StartOfLine | EndOfLine | WordBoundary deriving (Typeable, Data)
 data Risp = CharSet (Set Char)
@@ -97,7 +101,8 @@ data RispError = NumArgs Integer [Risp]
     | Parser ParseError
     | BadSpecialForm String Risp
     | NotFunction String String
-    | UnboundVar String String -- the variable has not been declared
+    | UnboundVar String -- the variable has not been declared
+    | VarAlreadyExists String
     | Default String
 
 showError :: RispError -> String
@@ -106,7 +111,8 @@ showError (TypeMismatch expected found) = "Invalid type: expected " ++ expected 
 showError (Parser parseErr) = "Parse error at " ++ show parseErr
 showError (BadSpecialForm message form) = message ++ ": " ++ show form
 showError (NotFunction message func) = message ++ ": " ++ show func
-showError (UnboundVar message varname) = message ++ ": " ++ varname
+showError (UnboundVar varname) = "Getting an unbound variable: " ++ varname
+showError (VarAlreadyExists varname) = "Already existed var: " ++ varname
 showError (Default message) = show message
 instance Show RispError where show = showError
 
@@ -117,6 +123,7 @@ extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
 -------------- EVAL (set, and (math)) --------------
+-- eval :: Risp -> StateT EnvStack ThrowsError Risp
 eval :: Risp -> ThrowsError Risp
 eval (Func ((Atom "union"): args)) =
     do
@@ -184,3 +191,72 @@ main = do
      let evaled = fmap show $ readExpr (head args) >>= eval >>= translate
      putStrLn $ extractValue $ trapError evaled
 
+type StackFrame = [(String, Risp)]
+type EnvStack = [StackFrame]
+
+initialEnvStack :: EnvStack
+initialEnvStack = [[]]
+
+defineVar :: String -> Risp -> StateT EnvStack ThrowsError ()
+defineVar varName risp =
+    do
+        alreadyExists <- isBound varName
+        if alreadyExists
+            then lift (throwError $ VarAlreadyExists varName)
+            else do
+                topFrame <- pop
+                push $ (varName, risp) : topFrame
+
+-- bind several variables in a new stack frame
+bindVars :: [(String, Risp)] -> StateT EnvStack ThrowsError()
+bindVars bindings = do
+    -- let strList = Data.List.map fst bindings
+    boolList <- mapM (isBound . fst) bindings
+    let firstTrueIndex = elemIndex True boolList
+    case firstTrueIndex of
+        Just i -> lift (throwError . VarAlreadyExists . fst $ bindings !! i)
+        Nothing -> do push bindings
+
+
+
+readVar :: String -> StateT EnvStack ThrowsError Risp
+readVar varName = StateT \envStack -> case lookup varName $ concat envStack of
+    Just val -> return (val, envStack)
+    _ -> throwError $ UnboundVar varName
+
+-- idState :: State EnvStack ()
+-- idState = state ((),)
+
+--  determine if a given variable is already bound in the environment
+-- we search the entire stack because we don't want to allow a user to change
+-- the value associated with a variable name
+isBound :: String -> StateT EnvStack ThrowsError Bool
+isBound varName = StateT \envStack -> return (isJust $ lookup varName $ concat envStack, envStack)
+
+-- redefining variable
+-- let a = 1;
+-- let a = 2;
+-- (define a 1)
+-- (define a 2)
+-- (define (lambda ... (let (a 5) (lambda .. (...)))))
+-- (let (a 7) (call it))
+-- mutating variable
+-- let mut b = &mut 1;
+-- *b = 2;
+
+-- mutating reference
+-- let mut c = &mut 2;
+-- c = &mut 3;
+
+-- s -> s a
+-- s should be a list like [(name, value)]
+-- if we want to read a variable, a would be the value
+-- imaginary stack: [[(name, value)]]
+
+--
+
+pop :: StateT EnvStack ThrowsError StackFrame
+pop = StateT $ \(x:xs) -> return (x,xs)
+
+push :: StackFrame -> StateT EnvStack ThrowsError ()
+push a = StateT $ \xs -> return ((), a:xs)
