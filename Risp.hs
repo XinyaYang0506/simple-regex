@@ -123,20 +123,20 @@ extractValue :: ThrowsError a -> a
 extractValue (Right val) = val
 
 -------------- EVAL (set, and (math)) --------------
--- eval :: Risp -> StateT EnvStack ThrowsError Risp
-eval :: Risp -> ThrowsError Risp
+eval :: Risp -> StateT EnvStack ThrowsError Risp
+-- eval :: Risp -> ThrowsError Risp
 eval (Func ((Atom "union"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
-        listOfSets <- mapM extractCharSet listOfEvaledArgs
+        listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
         let resultSet = unions listOfSets
         return $ CharSet resultSet
 eval (Func ((Atom funcName): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         return $ Func (Atom funcName: listOfEvaledArgs)
-eval (Func (wrongHead : _)) = throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
-eval val@(RegExp regExp) = throwError $ TypeMismatch "not regExp" val
+eval (Func (wrongHead : _)) = lift $ throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
+eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val
 eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
@@ -188,8 +188,9 @@ trapError action = catchError action (return . show)
 main :: IO ()
 main = do
      args <- getArgs
-     let evaled = fmap show $ readExpr (head args) >>= eval >>= translate
-     putStrLn $ extractValue $ trapError evaled
+     let some = readExpr (head args) >>= \risp -> runStateT (eval risp) initialEnvStack
+     let result = some >>= \tuple -> translate (fst tuple)
+     putStrLn $ extractValue $ trapError (fmap show result)
 
 type StackFrame = [(String, Risp)]
 type EnvStack = [StackFrame]
