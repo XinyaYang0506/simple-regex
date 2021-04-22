@@ -2,6 +2,7 @@
 module Stack (EnvStack, initialEnvStack, defineVar, readVar) where
 import Risp
 import RispError
+import RispSet
 import Control.Monad.State
 import Control.Monad.Except
 import Data.List
@@ -13,7 +14,7 @@ type StackFrame = [(String, Risp)]
 type EnvStack = [StackFrame]
 
 initialEnvStack :: EnvStack
-initialEnvStack = [[]]
+initialEnvStack = initialCharSets
 
 defineVar :: String -> Risp -> StateT EnvStack EitherError Risp
 defineVar varName risp =

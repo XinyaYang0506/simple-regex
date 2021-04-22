@@ -1,5 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
-{-# OPTIONS_GHC -Wno-deferred-type-errors #-}
+-- {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 {-# LANGUAGE ExistentialQuantification #-}
 import Risp
 import Parse
