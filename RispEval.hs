@@ -16,6 +16,9 @@ extractCharSet :: Risp -> EitherError (Set Char)
 extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
+intersections :: (Foldable f, Ord a) => f (Set a) -> Set a
+intersections = foldl1 intersection
+
 -------------- EVAL (set, and (math)) --------------
 eval :: Risp -> StateT EnvStack EitherError Risp
 -- eval :: Risp -> EitherError Risp
@@ -24,6 +27,13 @@ eval (Func ((Atom "union"): args)) =
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
         let resultSet = unions listOfSets
+        return $ CharSet resultSet
+
+eval (Func ((Atom "intersection"): args)) =
+    do
+        listOfEvaledArgs <- mapM eval args
+        listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
+        let resultSet = intersections listOfSets
         return $ CharSet resultSet
 eval (Func [Atom "define", Atom name, form]) = do
     value <- eval form
