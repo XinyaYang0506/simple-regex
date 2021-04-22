@@ -22,8 +22,8 @@ showError (VarAlreadyExists varname) = "Already existed var: " ++ varname
 showError (Default message) = show message
 instance Show RispError where show = showError
 
-type ThrowsError = Either RispError
+type EitherError = Either RispError
 
 -- get the right value of Either
-extractValue :: ThrowsError a -> a
+extractValue :: EitherError a -> a
 extractValue (Right val) = val

@@ -63,7 +63,7 @@ parseExpr = parseAnchor
     <|> parseChar
     <|> parseNumber
 
-readExpr :: String -> ThrowsError Risp
+readExpr :: String -> EitherError Risp
 readExpr input = case parse parseExpr "risp" input of
         Left err -> throwError $ Parser err
         Right val -> return val

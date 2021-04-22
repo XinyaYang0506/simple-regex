@@ -15,7 +15,7 @@ type EnvStack = [StackFrame]
 initialEnvStack :: EnvStack
 initialEnvStack = [[]]
 
-defineVar :: String -> Risp -> StateT EnvStack ThrowsError Risp
+defineVar :: String -> Risp -> StateT EnvStack EitherError Risp
 defineVar varName risp =
     do
         alreadyExists <- isBound varName
@@ -27,7 +27,7 @@ defineVar varName risp =
                 return risp
 
 -- bind several variables in a new stack frame
-bindVars :: [(String, Risp)] -> StateT EnvStack ThrowsError()
+bindVars :: [(String, Risp)] -> StateT EnvStack EitherError()
 bindVars bindings = do
     -- let strList = Data.List.map fst bindings
     boolList <- mapM (isBound . fst) bindings
@@ -36,7 +36,7 @@ bindVars bindings = do
         Just i -> lift (throwError . VarAlreadyExists . fst $ bindings !! i)
         Nothing -> do push bindings
 
-readVar :: String -> StateT EnvStack ThrowsError Risp
+readVar :: String -> StateT EnvStack EitherError Risp
 readVar varName = StateT \envStack -> case lookup varName $ concat envStack of
     Just val -> return (val, envStack)
     _ -> throwError $ UnboundVar varName
@@ -47,7 +47,7 @@ readVar varName = StateT \envStack -> case lookup varName $ concat envStack of
 --  determine if a given variable is already bound in the environment
 -- we search the entire stack because we don't want to allow a user to change
 -- the value associated with a variable name
-isBound :: String -> StateT EnvStack ThrowsError Bool
+isBound :: String -> StateT EnvStack EitherError Bool
 isBound varName = StateT \envStack -> return (isJust $ lookup varName $ concat envStack, envStack)
 
 -- redefining variable
@@ -72,8 +72,8 @@ isBound varName = StateT \envStack -> return (isJust $ lookup varName $ concat e
 
 --
 
-pop :: StateT EnvStack ThrowsError StackFrame
+pop :: StateT EnvStack EitherError StackFrame
 pop = StateT $ \(x:xs) -> return (x,xs)
 
-push :: StackFrame -> StateT EnvStack ThrowsError ()
+push :: StackFrame -> StateT EnvStack EitherError ()
 push a = StateT $ \xs -> return ((), a:xs)

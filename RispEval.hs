@@ -7,18 +7,18 @@ import Data.Set hiding (foldl)
 import Control.Monad.Except
 import Data.List
 
-extractRegExp :: Risp -> ThrowsError String
+extractRegExp :: Risp -> EitherError String
 extractRegExp (RegExp string) = return string
 extractRegExp notRegExp = throwError $ TypeMismatch "RegExp" notRegExp
 
 
-extractCharSet :: Risp -> ThrowsError (Set Char)
+extractCharSet :: Risp -> EitherError (Set Char)
 extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
 -------------- EVAL (set, and (math)) --------------
-eval :: Risp -> StateT EnvStack ThrowsError Risp
--- eval :: Risp -> ThrowsError Risp
+eval :: Risp -> StateT EnvStack EitherError Risp
+-- eval :: Risp -> EitherError Risp
 eval (Func ((Atom "union"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
@@ -40,7 +40,7 @@ eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val --t
 eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
-translate :: Risp -> ThrowsError Risp
+translate :: Risp -> EitherError Risp
 translate (Anchor StartOfLine) = return $ RegExp "^"
 translate (Anchor EndOfLine) = return $ RegExp "$"
 translate (Anchor WordBoundary) = return $ RegExp "\\b"
