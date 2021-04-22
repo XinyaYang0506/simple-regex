@@ -131,12 +131,18 @@ eval (Func ((Atom "union"): args)) =
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
         let resultSet = unions listOfSets
         return $ CharSet resultSet
+eval (Func [Atom "define", Atom name, form]) = do
+    value <- eval form
+    defineVar name value
+
 eval (Func ((Atom funcName): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         return $ Func (Atom funcName: listOfEvaledArgs)
 eval (Func (wrongHead : _)) = lift $ throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
-eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val
+eval (Atom varName) = readVar varName
+
+eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val --this type should only appear in translate
 eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
@@ -176,6 +182,54 @@ extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
 
+----------- REPL ---------------
+
+-- Flush result through IO
+
+flushStr :: String -> IO ()
+flushStr str = putStr str >> hFlush stdout
+
+readPrompt :: String -> IO String
+readPrompt prompt = flushStr prompt >> getLine
+
+-- evalAndPrint :: String -> StateT EnvStack IO ()
+-- evalAndPrint :: EnvStack -> String -> (EnvStack, IO ())
+
+-- evalAndPrint :: EnvRef -> String -> IO ()
+-- evalAndPrint envRef expr =  evalString envRef expr >>= putStrLn
+evalAndPrint :: String -> EnvStack -> IO EnvStack
+evalAndPrint expr oldEnvStack  =
+    let errorMonadPair = readExpr expr >>= \risp -> runStateT (eval risp) oldEnvStack in
+    case errorMonadPair of
+        Left err -> do
+            print err
+            return oldEnvStack
+        Right (risp, newEnvStack) -> do
+            let errorMonadRisp = translate risp
+            case errorMonadRisp of
+                Left err -> do
+                    print err
+                    return oldEnvStack
+                Right risp -> do
+                    print risp
+                    return newEnvStack
+
+-- evalString :: EnvStack -> String -> (EnvStack, IO String)
+-- evalString envStack expr = do
+--     errorMonadPair <- readExpr expr >>= \risp -> runStateT (eval risp) envStack
+
+--     return (newStack, show evaluated) -- this is as if IO (...,...)
+
+-- until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
+until_ pred prompt action initValue = do
+    result <- prompt --result is a string
+    if pred result
+        then return ()
+        else action result initValue >>= until_ pred prompt action
+
+
+runRepl :: IO ()
+runRepl = until_ (== "quit") (readPrompt "Lisp>>> ") evalAndPrint initialEnvStack
 ----------- MAIN ---------------
 readExpr :: String -> ThrowsError Risp
 readExpr input = case parse parseExpr "risp" input of
@@ -185,12 +239,20 @@ readExpr input = case parse parseExpr "risp" input of
 trapError :: (MonadError a m, Show a) => m String -> m String
 trapError action = catchError action (return . show)
 
+-- main :: IO ()
+-- main = do
+--      args <- getArgs
+--      let some = readExpr (head args) >>= \risp -> runStateT (eval risp) initialEnvStack
+--      let result = some >>= \tuple -> translate (fst tuple)
+--      putStrLn $ extractValue $ trapError (fmap show result)
+
 main :: IO ()
-main = do
-     args <- getArgs
-     let some = readExpr (head args) >>= \risp -> runStateT (eval risp) initialEnvStack
-     let result = some >>= \tuple -> translate (fst tuple)
-     putStrLn $ extractValue $ trapError (fmap show result)
+main = runRepl
+-- main = do
+--     args <- getArgs
+--     if Data.List.null args then runRepl else return
+
+
 
 type StackFrame = [(String, Risp)]
 type EnvStack = [StackFrame]
@@ -198,7 +260,7 @@ type EnvStack = [StackFrame]
 initialEnvStack :: EnvStack
 initialEnvStack = [[]]
 
-defineVar :: String -> Risp -> StateT EnvStack ThrowsError ()
+defineVar :: String -> Risp -> StateT EnvStack ThrowsError Risp
 defineVar varName risp =
     do
         alreadyExists <- isBound varName
@@ -207,6 +269,7 @@ defineVar varName risp =
             else do
                 topFrame <- pop
                 push $ (varName, risp) : topFrame
+                return risp
 
 -- bind several variables in a new stack frame
 bindVars :: [(String, Risp)] -> StateT EnvStack ThrowsError()
