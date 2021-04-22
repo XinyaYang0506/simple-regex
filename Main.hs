@@ -7,25 +7,18 @@ import RispError
 import Stack
 import RispEval
 import Control.Monad.Except
-
+import Data.List
 import System.IO
+import System.Environment
 import Control.Monad.State
--- import Extra.Control.Monad.Extra
-
 
 -- Flush result through IO
-
 flushStr :: String -> IO ()
 flushStr str = putStr str >> hFlush stdout
 
 readPrompt :: String -> IO String
 readPrompt prompt = flushStr prompt >> getLine
 
--- evalAndPrint :: String -> StateT EnvStack IO ()
--- evalAndPrint :: EnvStack -> String -> (EnvStack, IO ())
-
--- evalAndPrint :: EnvRef -> String -> IO ()
--- evalAndPrint envRef expr =  evalString envRef expr >>= putStrLn
 evalAndPrint :: String -> EnvStack -> IO EnvStack
 evalAndPrint expr oldEnvStack  =
     let errorMonadPair = readExpr expr >>= \risp -> runStateT (eval risp) oldEnvStack in
@@ -43,13 +36,6 @@ evalAndPrint expr oldEnvStack  =
                     print risp
                     return newEnvStack
 
--- evalString :: EnvStack -> String -> (EnvStack, IO String)
--- evalString envStack expr = do
---     errorMonadPair <- readExpr expr >>= \risp -> runStateT (eval risp) envStack
-
---     return (newStack, show evaluated) -- this is as if IO (...,...)
-
--- until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
 until_ pred prompt action initValue = do
     result <- prompt --result is a string
     if pred result
@@ -58,25 +44,22 @@ until_ pred prompt action initValue = do
 
 
 runRepl :: IO ()
-runRepl = until_ (== "quit") (readPrompt "Lisp>>> ") evalAndPrint initialEnvStack
+runRepl = until_ (== "quit") (readPrompt "Risp>>> ") evalAndPrint initialEnvStack
 ----------- MAIN ---------------
 
 
 trapError :: (MonadError a m, Show a) => m String -> m String
 trapError action = catchError action (return . show)
 
--- main :: IO ()
--- main = do
---      args <- getArgs
---      let some = readExpr (head args) >>= \risp -> runStateT (eval risp) initialEnvStack
---      let result = some >>= \tuple -> translate (fst tuple)
---      putStrLn $ extractValue $ trapError (fmap show result)
+runOne :: String -> IO ()
+runOne expr = let errorMonadPair = readExpr expr >>= \risp -> runStateT (eval risp) initialEnvStack in
+     let result = errorMonadPair >>= \tuple -> translate (fst tuple) in
+     putStrLn $ extractValue $ trapError (fmap show result)
 
 main :: IO ()
-main = runRepl
--- main = do
---     args <- getArgs
---     if Data.List.null args then runRepl else return
+main = do
+    args <- getArgs
+    if Data.List.null args then runRepl else runOne (head args)
 
 
 
