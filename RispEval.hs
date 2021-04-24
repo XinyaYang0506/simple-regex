@@ -3,7 +3,7 @@ import Risp
 import Stack
 import RispError
 import Control.Monad.State
-import Data.Set hiding (foldl)
+import Data.Set hiding (foldl, map)
 import Control.Monad.Except
 import Data.List
 
@@ -21,28 +21,48 @@ intersections = foldl1 intersection
 -------------- EVAL (set, and (math)) --------------
 eval :: Risp -> StateT EnvStack EitherError Risp
 -- eval :: Risp -> EitherError Risp
-eval (Func ((Atom "union"): args)) =
+eval (List ((Atom "union"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
         let resultSet = unions listOfSets
         return $ CharSet resultSet
 
-eval (Func ((Atom "intersection"): args)) =
+eval (List ((Atom "intersection"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
         let resultSet = intersections listOfSets
         return $ CharSet resultSet
-eval (Func [Atom "define", Atom name, form]) = do
+eval (List [Atom "define", Atom name, form]) = do
     value <- eval form
     defineVar name value
-
-eval (Func ((Atom funcName): args)) =
+eval (List [Atom "lambda", List params, body]) = do
+    envStack <- get
+    return $ FuncDefinition {
+        params = map showVal params,
+        closure = envStack,
+        body = body
+    }
+eval (List ((Atom funcName): args)) =
     do
         listOfEvaledArgs <- mapM eval args
-        return $ Func (Atom funcName: listOfEvaledArgs)
-eval (Func (wrongHead : _)) = lift $ throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
+        -- return $ List (Atom funcName: listOfEvaledArgs)
+        funcIsBound <- isBound funcName
+        if funcIsBound
+            then do
+                func <- readVar funcName
+                case func of
+                    FuncDefinition { params = params, closure = closure, body = body } -> do
+                        oldEnvStack <- get
+                        put closure -- the envstack to be closure
+                        bindVars $ zip params listOfEvaledArgs -- add these vars into envstack                        
+                        result <- eval body
+                        put oldEnvStack
+                        return result
+                    _ -> lift $ throwError $ TypeMismatch "function" $ Atom funcName
+            else return $ List (Atom funcName : listOfEvaledArgs)
+eval (List (wrongHead : _)) = lift $ throwError $ TypeMismatch "FuncKeyword/Atom" wrongHead
 eval (Atom varName) = readVar varName
 
 eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val --this type should only appear in translate
@@ -56,34 +76,35 @@ translate (Anchor WordBoundary) = return $ RegExp "\\b"
 translate val@(Number num) = throwError $ TypeMismatch "not number" val
 translate (CharSet charSet) = return $ RegExp $ "[" ++ toAscList charSet ++ "]" -- TODO: add escape characters
 translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
-translate (Func ((Atom "concat") : args)) =
+translate (List ((Atom "concat") : args)) =
     do
         listOfTranslatedArgs <- mapM translate args
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
         let concatedString = concat listOfRegExp
         return $ RegExp $ "(" ++ concatedString ++ ")"
-translate (Func [Atom "repeatRange", pattrn, Number min, Number max]) =
+translate (List [Atom "repeatRange", pattrn, Number min, Number max]) =
     do
         translatedPattern <- translate pattrn
         translatedString <- extractRegExp translatedPattern
         return $ RegExp $ "(" ++ translatedString ++ "{" ++ show min ++ "," ++ show max ++ "}" ++ ")"
-translate (Func ((Atom "or") : args)) =
+translate (List ((Atom "or") : args)) =
     do
         listOfTranslatedArgs <- mapM translate args
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
         return $ RegExp $ "(" ++ intercalate "|" listOfRegExp ++ ")"
-translate (Func [Atom "optional", pattrn]) =
+translate (List [Atom "optional", pattrn]) =
     do
         translatedPattern <- translate pattrn
         translatedString <- extractRegExp translatedPattern
-        return $ RegExp $ "(" ++ translatedString ++ ")?"
-translate (Func [Atom "at_least_0_times", pattrn]) =
+        return $ RegExp $ "(" ++ translatedString ++ "?)"
+translate (List [Atom "at_least_0_times", pattrn]) =
     do
         translatedPattern <- translate pattrn
         translatedString <- extractRegExp translatedPattern
-        return $ RegExp $ "(" ++ translatedString ++ ")*"
-translate (Func [Atom "at_least_1_time", pattrn]) =
+        return $ RegExp $ "(" ++ translatedString ++ "*)"
+translate (List [Atom "at_least_1_time", pattrn]) =
     do
         translatedPattern <- translate pattrn
         translatedString <- extractRegExp translatedPattern
-        return $ RegExp $ "(" ++ translatedString ++ ")+"
+        return $ RegExp $ "(" ++ translatedString ++ "+)"
+translate val@(FuncDefinition _ _ _) = return val

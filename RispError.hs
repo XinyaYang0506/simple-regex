@@ -9,6 +9,7 @@ data RispError = NumArgs Integer [Risp]
     | NotFunction String String
     | UnboundVar String -- the variable has not been declared
     | VarAlreadyExists String
+    | ReservedKeyword String
     | Default String
 
 showError :: RispError -> String
@@ -19,6 +20,7 @@ showError (BadSpecialForm message form) = message ++ ": " ++ show form
 showError (NotFunction message func) = message ++ ": " ++ show func
 showError (UnboundVar varname) = "Getting an unbound variable: " ++ varname
 showError (VarAlreadyExists varname) = "Already existed var: " ++ varname
+showError (ReservedKeyword varname) = "Illegal use of reserved keyword: " ++ varname
 showError (Default message) = show message
 instance Show RispError where show = showError
 

@@ -49,16 +49,17 @@ parseAtom = do
 spaces1 :: Parser ()
 spaces1 = skipMany1 space
 
-parseFunc :: Parser Risp
-parseFunc =
-    between beg end (Func <$> sepEndBy parseExpr spaces1)
+parseList :: Parser Risp
+parseList =
+    between beg end (List <$> sepEndBy parseExpr spaces1)
     where
         beg = char '(' >> skipMany space
         end = skipMany space >> char ')'
 
+
 parseExpr :: Parser Risp
 parseExpr = parseAnchor
-    <|> parseFunc
+    <|> parseList
     <|> parseAtom
     <|> parseChar
     <|> parseNumber

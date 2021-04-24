@@ -1,5 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
-module Stack (EnvStack, initialEnvStack, defineVar, readVar) where
+module Stack (EnvStack, initialEnvStack, defineVar, readVar,isBound, bindVars) where
 import Risp
 import RispError
 import RispSet
@@ -8,10 +8,8 @@ import Control.Monad.Except
 import Data.List
 import Data.Maybe
 
-
-
-type StackFrame = [(String, Risp)]
-type EnvStack = [StackFrame]
+-- type StackFrame = [(String, Risp)]
+-- type EnvStack = [StackFrame]
 
 initialEnvStack :: EnvStack
 initialEnvStack = initialCharSets
@@ -30,9 +28,8 @@ defineVar varName risp =
 -- bind several variables in a new stack frame
 bindVars :: [(String, Risp)] -> StateT EnvStack EitherError()
 bindVars bindings = do
-    -- let strList = Data.List.map fst bindings
-    boolList <- mapM (isBound . fst) bindings
-    let firstTrueIndex = elemIndex True boolList
+    isBoundBoolList <- mapM (isBound . fst) bindings
+    let firstTrueIndex = elemIndex True isBoundBoolList
     case firstTrueIndex of
         Just i -> lift (throwError . VarAlreadyExists . fst $ bindings !! i)
         Nothing -> do push bindings
