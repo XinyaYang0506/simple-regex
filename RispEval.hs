@@ -11,7 +11,6 @@ extractRegExp :: Risp -> EitherError String
 extractRegExp (RegExp string) = return string
 extractRegExp notRegExp = throwError $ TypeMismatch "RegExp" notRegExp
 
-
 extractCharSet :: Risp -> EitherError (Set Char)
 extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
@@ -73,3 +72,18 @@ translate (Func ((Atom "or") : args)) =
         listOfTranslatedArgs <- mapM translate args
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
         return $ RegExp $ "(" ++ intercalate "|" listOfRegExp ++ ")"
+translate (Func [Atom "optional", pattrn]) =
+    do
+        translatedPattern <- translate pattrn
+        translatedString <- extractRegExp translatedPattern
+        return $ RegExp $ "(" ++ translatedString ++ ")?"
+translate (Func [Atom "at_least_0_times", pattrn]) =
+    do
+        translatedPattern <- translate pattrn
+        translatedString <- extractRegExp translatedPattern
+        return $ RegExp $ "(" ++ translatedString ++ ")*"
+translate (Func [Atom "at_least_1_time", pattrn]) =
+    do
+        translatedPattern <- translate pattrn
+        translatedString <- extractRegExp translatedPattern
+        return $ RegExp $ "(" ++ translatedString ++ ")+"
