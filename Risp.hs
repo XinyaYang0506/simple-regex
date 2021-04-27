@@ -16,6 +16,7 @@ data Risp = CharSet (Set Char)
     | Number Integer
     | RegExp String
     | Anchor Anchor
+    | String String
 
 -- show
 showVal :: Risp -> String
@@ -27,6 +28,7 @@ showVal (List list) = "(" ++ unwordsList list ++ ")"
 showVal FuncDefinition { params = params, closure = closure, body = body } =
     "(lambda (" ++ unwords (map show params) ++ ") ...)"
 showVal (RegExp str) = show str
+showVal (String str) = show str
 
 unwordsList :: [Risp] -> String
 unwordsList = unwords . Prelude.map showVal

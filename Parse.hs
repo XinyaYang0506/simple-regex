@@ -1,5 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
-module Parse (readExpr) where
+module Parse (readExpr, readExprList) where
 import Risp
 import RispError
 import Control.Monad.Except
@@ -39,6 +39,25 @@ parseChar = do
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=>?@^_~" -- ~
 
+-- In strings we escape " but we don't escape '
+escapedStringChars :: Parser Char
+escapedStringChars = do
+    char '\\' -- one backslash
+    x <- oneOf "\\\"nrt" --backslash, double quote, n, r or t
+    return $ case x of
+        '\\' -> x
+        '"' -> x
+        'n' -> '\n'
+        'r' -> '\r'
+        't' -> '\t'
+
+parseString :: Parser Risp
+parseString = do
+    char '\"'
+    x <- many1 $ escapedStringChars <|> noneOf "\"\\"
+    char '\"'
+    return $ String x
+
 parseAtom :: Parser Risp
 parseAtom = do
     first <- letter <|> symbol
@@ -62,9 +81,14 @@ parseExpr = parseAnchor
     <|> parseList
     <|> parseAtom
     <|> parseChar
+    <|> parseString
     <|> parseNumber
 
-readExpr :: String -> EitherError Risp
-readExpr input = case parse parseExpr "risp" input of
-        Left err -> throwError $ Parser err
-        Right val -> return val
+readOrThrow :: Parser a -> String -> EitherError a
+readOrThrow parser input = case parse parser "lisp" input of
+    Left err  -> throwError $ Parser err
+    Right val -> return val
+
+readExpr = readOrThrow parseExpr
+readExprList = readOrThrow (sepEndBy parseExpr spaces1) --repetively
+            

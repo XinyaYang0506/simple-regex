@@ -19,22 +19,46 @@ flushStr str = putStr str >> hFlush stdout
 readPrompt :: String -> IO String
 readPrompt prompt = flushStr prompt >> getLine
 
-evalAndPrint :: String -> EnvStack -> IO EnvStack
-evalAndPrint expr oldEnvStack  =
-    let errorMonadPair = readExpr expr >>= \risp -> runStateT (eval risp) oldEnvStack in
-    case errorMonadPair of
-        Left err -> do
-            print err
-            return oldEnvStack
-        Right (risp, newEnvStack) -> do
-            let errorMonadRisp = translate risp
-            case errorMonadRisp of
+evalAndPrint :: Risp -> EnvStack -> IO EnvStack
+evalAndPrint risp oldEnvStack  = do
+    -- print risp
+    case risp of
+        List [Atom "load", String path] -> do
+            exprList <- readFile path
+            print exprList
+            -- parseEvalAndPrint exprList oldEnvStack
+            let eitherRispList = readExprList exprList
+            case eitherRispList of 
+                Right rispList -> foldM (flip evalAndPrint) oldEnvStack rispList
                 Left err -> do
                     print err
                     return oldEnvStack
-                Right risp -> do
-                    print risp
-                    return newEnvStack
+            
+            -- evalAndPrint str oldEnvStack
+            -- (readFile path) >>= readExprList
+            -- evalAndPrint
+        _ -> case runStateT (eval risp) oldEnvStack of
+                Left err -> do
+                    print err
+                    return oldEnvStack
+                Right (newRisp, newEnvStack) -> do
+                    case translate newRisp of
+                        Left err -> do
+                            print err
+                            return oldEnvStack
+                        Right translatedRisp -> do
+                            print translatedRisp
+                            return newEnvStack
+parseEvalAndPrint :: String -> EnvStack -> IO EnvStack
+parseEvalAndPrint expr oldEnvStack  =
+    case readExpr expr of
+        Right risp -> do
+            evalAndPrint risp oldEnvStack
+        Left err -> do
+            print err
+            return oldEnvStack
+            
+
 
 until_ pred prompt action initValue = do
     result <- prompt --result is a string
@@ -44,7 +68,7 @@ until_ pred prompt action initValue = do
 
 
 runRepl :: IO ()
-runRepl = until_ (== "quit") (readPrompt "Risp>>> ") evalAndPrint initialEnvStack
+runRepl = until_ (== "quit") (readPrompt "Risp>>> ") parseEvalAndPrint initialEnvStack
 ----------- MAIN ---------------
 
 
