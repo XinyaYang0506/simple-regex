@@ -27,8 +27,8 @@ showVal (Number number) = show number
 showVal (List list) = "(" ++ unwordsList list ++ ")"
 showVal FuncDefinition { params = params, closure = closure, body = body } =
     "(lambda (" ++ unwords (map show params) ++ ") ...)"
-showVal (RegExp str) = show str
-showVal (String str) = show str
+showVal (RegExp str) = str
+showVal (String str) = str
 
 unwordsList :: [Risp] -> String
 unwordsList = unwords . Prelude.map showVal

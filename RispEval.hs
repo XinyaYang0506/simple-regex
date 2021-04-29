@@ -1,11 +1,13 @@
 module RispEval(eval, translate) where
 import Risp
+import RispSet
 import Stack
 import RispError
 import Control.Monad.State
 import Data.Set hiding (foldl, map)
 import Control.Monad.Except
 import Data.List
+import Data.Char
 
 extractRegExp :: Risp -> EitherError String
 extractRegExp (RegExp string) = return string
@@ -69,12 +71,32 @@ eval val@(RegExp regExp) = lift $ throwError $ TypeMismatch "not regExp" val --t
 eval x = return x -- maybe should not include Atom
 
 ------------ TRANSLATE ------------------
+simplify :: Set Char -> String
+simplify set
+  | set `intersection` word == word = "\\w" ++ simplify (set `difference` word)
+  | set `intersection` whitespace == whitespace = "\\s" ++ simplify (set `difference` whitespace)
+  | set `intersection` digits == digits = "\\d" ++ simplify (set `difference` digits)
+  | otherwise = init $ tail $ show $ concatMap rangeToString (foldl formRanges [] (toAscList set))
+
+-- Each pair of chars is a range
+formRanges :: [(Char, Char)] -> Char -> [(Char, Char)]
+formRanges [] newChar = [(newChar, newChar)]
+formRanges ((low, high) : tail) newChar = if ord newChar == ord high + 1
+    then (low, newChar) : tail
+    else (newChar, newChar) : ((low, high) : tail)
+
+rangeToString :: (Char, Char) -> String
+rangeToString ('0', '9') = "\\d"
+rangeToString (low, high) = if low == high
+    then [low]
+    else [low, '-', high]
+
 translate :: Risp -> EitherError Risp
 translate (Anchor StartOfLine) = return $ RegExp "^"
 translate (Anchor EndOfLine) = return $ RegExp "$"
 translate (Anchor WordBoundary) = return $ RegExp "\\b"
 translate val@(Number num) = throwError $ TypeMismatch "not number" val
-translate (CharSet charSet) = return $ RegExp $ "[" ++ toAscList charSet ++ "]" -- TODO: add escape characters
+translate (CharSet charSet) = return $ RegExp $ "[" ++ simplify charSet ++ "]"
 translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
 translate (List ((Atom "concat") : args)) =
     do
