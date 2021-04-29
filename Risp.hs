@@ -9,7 +9,7 @@ type StackFrame = [(String, Risp)]
 type EnvStack = [StackFrame]
 
 data Anchor = StartOfLine | EndOfLine | WordBoundary deriving (Typeable, Data)
-data Risp = CharSet (Set Char)
+data Risp = CharSet EitherCharSet
     | List [Risp]
     | FuncDefinition{ params :: [String], closure :: EnvStack, body :: Risp}
     | Atom String
@@ -18,10 +18,13 @@ data Risp = CharSet (Set Char)
     | Anchor Anchor
     | String String
 
+data EitherCharSet = Positive (Set Char) | Negative (Set Char)
+
 -- show
 showVal :: Risp -> String
 showVal (Anchor anchor) = "@" ++ (showConstr . toConstr) anchor
-showVal (CharSet set) = "[" ++ show set ++ "]"
+showVal (CharSet (Positive set)) = "[" ++ show set ++ "]"
+showVal (CharSet (Negative set)) = "[^" ++ show set ++ "]"
 showVal (Atom name) = name
 showVal (Number number) = show number
 showVal (List list) = "(" ++ unwordsList list ++ ")"

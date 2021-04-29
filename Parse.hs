@@ -34,7 +34,7 @@ parseChar = do
     char '\'' --single quote
     x <- escapedChars <|> noneOf "'\\"
     char '\'' --single quote
-    return $ CharSet $ singleton x
+    return $ CharSet $ Positive $ singleton x
 
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=>?@^_~" -- ~

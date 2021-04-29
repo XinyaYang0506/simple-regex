@@ -13,10 +13,10 @@ whitespace = fromList [' ', '\t', '\r', '\n', '\f', '\v']
 word = lowerLetters `union` upperLetters `union` digits `union` singleton '_'
 
 initialCharSets = [[
-    ("digits", CharSet digits),
-    ("lowercase_letters", CharSet lowerLetters),
-    ("uppercase_letters", CharSet upperLetters),
-    ("whitespace", CharSet whitespace),
-    ("word", CharSet word),
-    ("letters", CharSet $ lowerLetters `union` upperLetters)]]
+    ("digits", CharSet $ Positive digits),
+    ("lowercase_letters", CharSet $ Positive lowerLetters),
+    ("uppercase_letters", CharSet $ Positive upperLetters),
+    ("whitespace", CharSet $ Positive whitespace),
+    ("word", CharSet $ Positive word),
+    ("letters", CharSet $ Positive $ lowerLetters `union` upperLetters)]]
     

@@ -6,36 +6,69 @@ import RispError
 import Control.Monad.State
 import Data.Set hiding (foldl, map)
 import Control.Monad.Except
-import Data.List
+import Data.List hiding (union)
 import Data.Char
 
 extractRegExp :: Risp -> EitherError String
 extractRegExp (RegExp string) = return string
 extractRegExp notRegExp = throwError $ TypeMismatch "RegExp" notRegExp
 
-extractCharSet :: Risp -> EitherError (Set Char)
+extractCharSet :: Risp -> EitherError EitherCharSet
 extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
-intersections :: (Foldable f, Ord a) => f (Set a) -> Set a
-intersections = foldl1 intersection
+-- charIntersections :: (Foldable f) => f CharSet -> CharSet
+-- intersections = foldl1 charIntersection
 
+charUnion :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charUnion (Positive p1) (Positive p2) = Positive $ p1 `union` p2
+charUnion (Positive p) (Negative n) = Negative $ n `difference` p
+charUnion (Negative n) (Positive p) = Negative $ n `difference` p
+charUnion (Negative n1) (Negative n2) = Negative $ n1 `union` n2
+
+charIntersection :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charIntersection (Positive p1) (Positive p2) = Positive $ p1 `intersection` p2
+charIntersection (Positive p) (Negative n) = Positive $ p `difference` n
+charIntersection (Negative n) (Positive p) = Positive $ p `difference` n
+charIntersection (Negative n1) (Negative n2) = Negative $ n1 `union` n2
+
+charDiff :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charDiff (Positive p1) (Positive p2) = Positive $ p1 `difference` p2
+charDiff (Positive p) (Negative n) = Positive $ p `intersection` n
+charDiff (Negative n) (Positive p) = Negative $ p `union` n
+charDiff (Negative n1) (Negative n2) = Positive $ n2 `difference` n1
 -------------- EVAL (set, and (math)) --------------
 eval :: Risp -> StateT EnvStack EitherError Risp
 -- eval :: Risp -> EitherError Risp
+eval (List [Atom "negate", arg]) = 
+    do
+        evaledArg <- eval arg
+        eitherSet <- lift $ extractCharSet evaledArg
+        case eitherSet of
+            Positive set -> return $ CharSet $ Negative set
+            Negative set -> return $ CharSet $ Positive set
+eval (List ((Atom "negate") : args)) = lift $ throwError $ NumArgs 1 args
 eval (List ((Atom "union"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
-        let resultSet = unions listOfSets
+        let resultSet = foldl1 charUnion listOfSets
         return $ CharSet resultSet
-
 eval (List ((Atom "intersection"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
-        let resultSet = intersections listOfSets
+        let resultSet = foldl1 charIntersection listOfSets
         return $ CharSet resultSet
+eval (List [Atom "diff", arg1, arg2]) =
+    do
+        evaledArg1 <- eval arg1
+        evaledArg2 <- eval arg2
+        set1 <- lift $ extractCharSet evaledArg1
+        set2 <- lift $ extractCharSet evaledArg2
+        let resultSet = charDiff set1 set2
+        return $ CharSet resultSet
+eval (List ((Atom "diff") : args)) = lift $ throwError $ NumArgs 2 args
 eval (List [Atom "define", Atom name, form]) = do
     value <- eval form
     defineVar name value
@@ -96,7 +129,8 @@ translate (Anchor StartOfLine) = return $ RegExp "^"
 translate (Anchor EndOfLine) = return $ RegExp "$"
 translate (Anchor WordBoundary) = return $ RegExp "\\b"
 translate val@(Number num) = throwError $ TypeMismatch "not number" val
-translate (CharSet charSet) = return $ RegExp $ "[" ++ simplify charSet ++ "]"
+translate (CharSet (Positive charSet)) = return $ RegExp $ "[" ++ simplify charSet ++ "]"
+translate (CharSet (Negative charSet)) = return $ RegExp $ "[^" ++ simplify charSet ++ "]"
 translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
 translate (List ((Atom "concat") : args)) =
     do
