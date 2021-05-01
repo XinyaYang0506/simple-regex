@@ -109,8 +109,11 @@ simplify set
   | set `intersection` word == word = "\\w" ++ simplify (set `difference` word)
   | set `intersection` whitespace == whitespace = "\\s" ++ simplify (set `difference` whitespace)
   | set `intersection` digits == digits = "\\d" ++ simplify (set `difference` digits)
-  | otherwise = init $ tail $ show $ concatMap rangeToString (foldl formRanges [] (toAscList set))
+  | otherwise = escapeCaretAtBeginning $ init $ tail $ show $ concatMap rangeToString (foldl formRanges [] (toAscList set)) --init and tail get rid of quotation marks
 
+escapeCaretAtBeginning :: String -> String
+escapeCaretAtBeginning ('^' : tail) = "\\^" ++ tail
+escapeCaretAtBeginning string = string
 -- Each pair of chars is a range
 formRanges :: [(Char, Char)] -> Char -> [(Char, Char)]
 formRanges [] newChar = [(newChar, newChar)]
@@ -129,8 +132,12 @@ translate (Anchor StartOfLine) = return $ RegExp "^"
 translate (Anchor EndOfLine) = return $ RegExp "$"
 translate (Anchor WordBoundary) = return $ RegExp "\\b"
 translate val@(Number num) = throwError $ TypeMismatch "not number" val
-translate (CharSet (Positive charSet)) = return $ RegExp $ "[" ++ simplify charSet ++ "]"
-translate (CharSet (Negative charSet)) = return $ RegExp $ "[^" ++ simplify charSet ++ "]"
+translate (CharSet (Positive charSet)) = if charSet == empty
+    then throwError EmptyCharSet
+    else return $ RegExp $ "[" ++ simplify charSet ++ "]"
+translate (CharSet (Negative charSet)) = if charSet == empty
+    then return $ RegExp "."
+    else return $ RegExp $ "[^" ++ simplify charSet ++ "]"
 translate val@(Atom atom) = throwError $ TypeMismatch "not atom" val
 translate (List ((Atom "concat") : args)) =
     do

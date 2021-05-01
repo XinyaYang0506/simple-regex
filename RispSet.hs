@@ -18,5 +18,6 @@ initialCharSets = [[
     ("uppercase_letters", CharSet $ Positive upperLetters),
     ("whitespace", CharSet $ Positive whitespace),
     ("word", CharSet $ Positive word),
+    ("any", CharSet $ Negative empty),
     ("letters", CharSet $ Positive $ lowerLetters `union` upperLetters)]]
     
