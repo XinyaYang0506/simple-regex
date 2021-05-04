@@ -11,6 +11,7 @@ import Data.List
 import System.IO
 import System.Environment
 import Control.Monad.State
+import Data.Map (empty)
 
 -- Flush result through IO
 flushStr :: String -> IO ()
@@ -42,7 +43,8 @@ evalAndPrint risp oldEnvStack  = do
                     print err
                     return oldEnvStack
                 Right (newRisp, newEnvStack) -> do
-                    case translate newRisp of
+                    let cgPairs = numberCaptureGroups empty newRisp
+                    case translate cgPairs newRisp of
                         Left err -> do
                             print err
                             return oldEnvStack
@@ -77,7 +79,7 @@ trapError action = catchError action (return . show)
 
 runOne :: String -> IO ()
 runOne expr = let errorMonadPair = readExpr expr >>= \risp -> runStateT (eval risp) initialEnvStack in
-     let result = errorMonadPair >>= \tuple -> translate (fst tuple) in
+     let result = errorMonadPair >>= \tuple -> translate (numberCaptureGroups empty (fst tuple)) (fst tuple) in
      putStrLn $ extractValue $ trapError (fmap show result)
 
 main :: IO ()

@@ -11,6 +11,7 @@ data RispError = NumArgs Integer [Risp]
     | VarAlreadyExists String
     | ReservedKeyword String
     | EmptyCharSet
+    | UnboundCaptureGroupName String
     | Default String
 
 showError :: RispError -> String
@@ -20,6 +21,7 @@ showError (Parser parseErr) = "Parse error at " ++ show parseErr
 showError (BadSpecialForm message form) = message ++ ": " ++ show form
 showError (NotFunction message func) = message ++ ": " ++ show func
 showError (UnboundVar varname) = "Getting an unbound variable: " ++ varname
+showError (UnboundCaptureGroupName name) = "Getting an unbound capture group name: " ++ name
 showError (VarAlreadyExists varname) = "Already existed var: " ++ varname
 showError (ReservedKeyword varname) = "Illegal use of reserved keyword: " ++ varname
 showError EmptyCharSet = "CharSet matches 0 characters"

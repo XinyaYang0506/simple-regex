@@ -17,6 +17,7 @@ data Risp = CharSet EitherCharSet
     | RegExp String
     | Anchor Anchor
     | String String
+    | CaptureGroupName String
 
 data EitherCharSet = Positive (Set Char) | Negative (Set Char)
 
@@ -32,6 +33,7 @@ showVal FuncDefinition { params = params, closure = closure, body = body } =
     "(lambda (" ++ unwords (map show params) ++ ") ...)"
 showVal (RegExp str) = str
 showVal (String str) = str
+showVal (CaptureGroupName name) = "{" ++ name ++ "}"
 
 unwordsList :: [Risp] -> String
 unwordsList = unwords . Prelude.map showVal

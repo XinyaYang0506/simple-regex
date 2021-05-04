@@ -65,6 +65,15 @@ parseAtom = do
     let atom = first:rest
     return (Atom atom)
 
+parseCaptureGroupName :: Parser Risp
+parseCaptureGroupName = do
+    char '{'
+    first <- letter <|> symbol
+    rest <- many (letter <|> symbol <|> digit)
+    let name = first:rest
+    char '}'
+    return (CaptureGroupName name)
+
 spaces1 :: Parser ()
 spaces1 = skipMany1 space
 
@@ -78,6 +87,7 @@ parseList =
 
 parseExpr :: Parser Risp
 parseExpr = parseAnchor
+    <|> parseCaptureGroupName
     <|> parseList
     <|> parseAtom
     <|> parseChar
