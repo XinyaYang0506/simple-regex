@@ -8,7 +8,7 @@ import Data.Typeable
 type StackFrame = [(String, Risp)]
 type EnvStack = [StackFrame]
 
-data Anchor = StartOfLine | EndOfLine | WordBoundary deriving (Typeable, Data)
+data Anchor = StartOfLine | EndOfLine | WordBoundary deriving (Typeable, Data, Eq)
 data Risp = CharSet EitherCharSet
     | List [Risp]
     | FuncDefinition{ params :: [String], closure :: EnvStack, body :: Risp}
@@ -18,8 +18,9 @@ data Risp = CharSet EitherCharSet
     | Anchor Anchor
     | String String
     | CaptureGroupName String
+    deriving Eq
 
-data EitherCharSet = Positive (Set Char) | Negative (Set Char)
+data EitherCharSet = Positive (Set Char) | Negative (Set Char) deriving Eq
 
 -- show
 showVal :: Risp -> String

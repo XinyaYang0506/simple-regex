@@ -1,4 +1,4 @@
-module RispEval(eval, translate, numberCaptureGroups) where
+module RispEval(eval, translate, numberCaptureGroups, identifyRisp, testConcatWeirdness) where
 import Risp
 import RispSet
 import Stack
@@ -80,7 +80,7 @@ eval (List [Atom "lambda", List params, body]) = do
         closure = envStack,
         body = body
     }
-        
+
 -- eval (List [Atom "create_capture_group", CaptureGroupName name, form]) = 
 --     do 
 --         evaledForm <- eval form
@@ -190,12 +190,35 @@ translate captureMap (List [Atom "at_least_1_time", pattrn]) =
         return $ RegExp $ "(?:" ++ translatedString ++ "+)"
 translate captureMap (List [Atom "create_capture_group", CaptureGroupName name, pattrn]) =
     do
-        translatedPattern <- translate captureMap pattrn
-        translatedString <- extractRegExp translatedPattern
-        return $ RegExp $ "(" ++ translatedString ++ ")"
+        let has_bind_capture_groups = identifyRisp (\risp -> risp == Atom "bind_capture_groups") pattrn
+        if has_bind_capture_groups
+            then throwError $ Default "Cannot bind capture groups inside search pattern"
+            else do
+                translatedPattern <- translate captureMap pattrn
+                translatedString <- extractRegExp translatedPattern
+                return $ RegExp $ "(" ++ translatedString ++ ")"
+translate _ (List (Atom "create_capture_group" : args)) = throwError $ NumArgs 2 args
 translate captureMap (CaptureGroupName name) =
     do
         case Map.lookup name captureMap of
             Just n -> return $ RegExp $ "\\" ++ show n
             Nothing -> throwError $ UnboundCaptureGroupName name
+-- (create_capture_group {cap} (bind_capture_groups 'a' 'a'))
+-- (create_capture_group {cap} rplc)
+translate _ (List [Atom "bind_capture_groups", search, replace]) =
+    do
+        let has_create_capture_group = identifyRisp (\risp -> risp == Atom "create_capture_group") replace
+        if has_create_capture_group
+            then throwError $ Default "Cannot create capture groups inside replace pattern"
+            else translate (numberCaptureGroups Map.empty search) replace
 translate _ val@(FuncDefinition _ _ _) = return val
+
+identifyRisp :: (Risp -> Bool) -> Risp -> Bool
+identifyRisp predicate risp = predicate risp || (case risp of
+                                                List lst -> any (identifyRisp predicate) lst
+                                                FuncDefinition _ _ body -> predicate body
+                                                _ -> False)
+
+testConcatWeirdness = identifyRisp
+    (\risp -> risp == Atom "bind_capture_groups")
+    
