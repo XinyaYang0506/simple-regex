@@ -146,7 +146,7 @@ translate :: Map.Map String Int -> Risp -> EitherError Risp
 translate _ (Anchor StartOfLine) = return $ RegExp "^"
 translate _ (Anchor EndOfLine) = return $ RegExp "$"
 translate _ (Anchor WordBoundary) = return $ RegExp "\\b"
-translate _ val@(Number num) = throwError $ TypeMismatch "not number" val
+translate _ val@(Integer num) = throwError $ TypeMismatch "not number" val
 translate _ (CharSet (Positive charSet)) = if charSet == empty
     then throwError EmptyCharSet
     else return $ RegExp $ "[" ++ simplify charSet ++ "]"
@@ -160,7 +160,7 @@ translate captureMap (List ((Atom "concat") : args)) =
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
         let concatedString = concat listOfRegExp
         return $ RegExp $ "(?:" ++ concatedString ++ ")"
-translate captureMap (List [Atom "repeat_range", pattrn, Number min, Number max]) =
+translate captureMap (List [Atom "repeat_range", pattrn, Integer min, Integer max]) =
     do
         translatedPattern <- translate captureMap pattrn
         translatedString <- extractRegExp translatedPattern

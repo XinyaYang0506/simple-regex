@@ -13,7 +13,7 @@ data Risp = CharSet EitherCharSet
     | List [Risp]
     | FuncDefinition{ params :: [String], closure :: EnvStack, body :: Risp}
     | Atom String
-    | Number Integer
+    | Integer Integer
     | RegExp String
     | Anchor Anchor
     | String String
@@ -28,7 +28,7 @@ showVal (Anchor anchor) = "@" ++ (showConstr . toConstr) anchor
 showVal (CharSet (Positive set)) = "[" ++ show set ++ "]"
 showVal (CharSet (Negative set)) = "[^" ++ show set ++ "]"
 showVal (Atom name) = name
-showVal (Number number) = show number
+showVal (Integer number) = show number
 showVal (List list) = "(" ++ unwordsList list ++ ")"
 showVal FuncDefinition { params = params, closure = closure, body = body } =
     "(lambda (" ++ unwords (map show params) ++ ") ...)"

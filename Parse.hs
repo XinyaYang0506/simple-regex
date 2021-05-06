@@ -15,8 +15,8 @@ parseAnchor = do
         "EndOfLine" -> EndOfLine
         "WordBoundary" -> WordBoundary
 
-parseNumber :: Parser Risp
-parseNumber = Number . read <$> many digit
+parseInteger :: Parser Risp
+parseInteger = Integer . read <$> many digit
 
 escapedChars :: Parser Char
 escapedChars = do
@@ -92,7 +92,7 @@ parseExpr = parseAnchor
     <|> parseAtom
     <|> parseChar
     <|> parseString
-    <|> parseNumber
+    <|> parseInteger
 
 readOrThrow :: Parser a -> String -> EitherError a
 readOrThrow parser input = case parse parser "lisp" input of
