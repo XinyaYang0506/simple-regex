@@ -1,6 +1,6 @@
 module RispEval(eval, translate, numberCaptureGroups, identifyRisp, testConcatWeirdness) where
 import Risp
-import RispSet
+import RispCharSet
 import Stack
 import RispError
 import Control.Monad.State
@@ -18,26 +18,23 @@ extractCharSet :: Risp -> EitherError EitherCharSet
 extractCharSet (CharSet set) = return set
 extractCharSet notCharSet = throwError $ TypeMismatch "CharSet" notCharSet
 
--- charIntersections :: (Foldable f) => f CharSet -> CharSet
--- intersections = foldl1 charIntersection
+charSetUnion :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charSetUnion (Positive p1) (Positive p2) = Positive $ p1 `union` p2
+charSetUnion (Positive p) (Negative n) = Negative $ n `difference` p
+charSetUnion (Negative n) (Positive p) = Negative $ n `difference` p
+charSetUnion (Negative n1) (Negative n2) = Negative $ n1 `union` n2
 
-charUnion :: EitherCharSet -> EitherCharSet -> EitherCharSet
-charUnion (Positive p1) (Positive p2) = Positive $ p1 `union` p2
-charUnion (Positive p) (Negative n) = Negative $ n `difference` p
-charUnion (Negative n) (Positive p) = Negative $ n `difference` p
-charUnion (Negative n1) (Negative n2) = Negative $ n1 `union` n2
+charSetIntersection :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charSetIntersection (Positive p1) (Positive p2) = Positive $ p1 `intersection` p2
+charSetIntersection (Positive p) (Negative n) = Positive $ p `difference` n
+charSetIntersection (Negative n) (Positive p) = Positive $ p `difference` n
+charSetIntersection (Negative n1) (Negative n2) = Negative $ n1 `union` n2
 
-charIntersection :: EitherCharSet -> EitherCharSet -> EitherCharSet
-charIntersection (Positive p1) (Positive p2) = Positive $ p1 `intersection` p2
-charIntersection (Positive p) (Negative n) = Positive $ p `difference` n
-charIntersection (Negative n) (Positive p) = Positive $ p `difference` n
-charIntersection (Negative n1) (Negative n2) = Negative $ n1 `union` n2
-
-charDiff :: EitherCharSet -> EitherCharSet -> EitherCharSet
-charDiff (Positive p1) (Positive p2) = Positive $ p1 `difference` p2
-charDiff (Positive p) (Negative n) = Positive $ p `intersection` n
-charDiff (Negative n) (Positive p) = Negative $ p `union` n
-charDiff (Negative n1) (Negative n2) = Positive $ n2 `difference` n1
+charSetDiff :: EitherCharSet -> EitherCharSet -> EitherCharSet
+charSetDiff (Positive p1) (Positive p2) = Positive $ p1 `difference` p2
+charSetDiff (Positive p) (Negative n) = Positive $ p `intersection` n
+charSetDiff (Negative n) (Positive p) = Negative $ p `union` n
+charSetDiff (Negative n1) (Negative n2) = Positive $ n2 `difference` n1
 -------------- EVAL (set, and (math)) --------------
 eval :: Risp -> StateT EnvStack EitherError Risp
 -- eval :: Risp -> EitherError Risp
@@ -53,13 +50,13 @@ eval (List ((Atom "union"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
-        let resultSet = foldl1 charUnion listOfSets
+        let resultSet = foldl1 charSetUnion listOfSets
         return $ CharSet resultSet
 eval (List ((Atom "intersection"): args)) =
     do
         listOfEvaledArgs <- mapM eval args
         listOfSets <- lift $ mapM extractCharSet listOfEvaledArgs
-        let resultSet = foldl1 charIntersection listOfSets
+        let resultSet = foldl1 charSetIntersection listOfSets
         return $ CharSet resultSet
 eval (List [Atom "diff", arg1, arg2]) =
     do
@@ -67,7 +64,7 @@ eval (List [Atom "diff", arg1, arg2]) =
         evaledArg2 <- eval arg2
         set1 <- lift $ extractCharSet evaledArg1
         set2 <- lift $ extractCharSet evaledArg2
-        let resultSet = charDiff set1 set2
+        let resultSet = charSetDiff set1 set2
         return $ CharSet resultSet
 eval (List ((Atom "diff") : args)) = lift $ throwError $ NumArgs 2 args
 eval (List [Atom "define", Atom name, form]) = do
@@ -163,7 +160,7 @@ translate captureMap (List ((Atom "concat") : args)) =
         listOfRegExp <- mapM extractRegExp listOfTranslatedArgs
         let concatedString = concat listOfRegExp
         return $ RegExp $ "(?:" ++ concatedString ++ ")"
-translate captureMap (List [Atom "repeatRange", pattrn, Number min, Number max]) =
+translate captureMap (List [Atom "repeat_range", pattrn, Number min, Number max]) =
     do
         translatedPattern <- translate captureMap pattrn
         translatedString <- extractRegExp translatedPattern

@@ -2,7 +2,7 @@
 module Stack (EnvStack, initialEnvStack, defineVar, readVar,isBound, bindVars) where
 import Risp
 import RispError
-import RispSet
+import RispCharSet
 import Control.Monad.State
 import Control.Monad.Except
 import Data.List

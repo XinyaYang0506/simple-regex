@@ -1,4 +1,4 @@
-module RispSet where
+module RispCharSet where
 import Data.Char
 import Data.Set
 import Risp
@@ -18,6 +18,6 @@ initialCharSets = [[
     ("uppercase_letters", CharSet $ Positive upperLetters),
     ("whitespace", CharSet $ Positive whitespace),
     ("word", CharSet $ Positive word),
-    ("any", CharSet $ Negative empty),
+    ("any", CharSet $ Negative fromList ['\n', '\r']),
     ("letters", CharSet $ Positive $ lowerLetters `union` upperLetters)]]
     
