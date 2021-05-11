@@ -151,8 +151,10 @@ translate _ (CharSet (Positive charSet)) = if charSet == empty
     then throwError EmptyCharSet
     else return $ RegExp $ "[" ++ simplify charSet ++ "]"
 translate _ (CharSet (Negative charSet)) = if charSet == empty
-    then return $ RegExp "."
-    else return $ RegExp $ "[^" ++ simplify charSet ++ "]"
+    then return $ RegExp "(?:.|[\\n\\r])"
+    else if charSet == fromList ['\n', '\r']
+        then return $ RegExp "."
+        else return $ RegExp $ "[^" ++ simplify charSet ++ "]"
 translate _ val@(Atom atom) = throwError $ TypeMismatch "not atom" val
 translate captureMap (List ((Atom "concat") : args)) =
     do

@@ -18,6 +18,7 @@ initialCharSets = [[
     ("uppercase_letters", CharSet $ Positive upperLetters),
     ("whitespace", CharSet $ Positive whitespace),
     ("word", CharSet $ Positive word),
-    ("any", CharSet $ Negative fromList ['\n', '\r']),
+    ("any", CharSet $ Negative empty)
+    ("non_new_line", CharSet $ Negative fromList ['\n', '\r']),
     ("letters", CharSet $ Positive $ lowerLetters `union` upperLetters)]]
     
