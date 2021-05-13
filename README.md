@@ -3,8 +3,8 @@
 Regular expression syntax can be hard to remember and hard to write. This command-line tool lets you write lisp-like syntax to construct regular expression patterns.
 
 ## Language Reference
-
-We only list the user-facing subset of data types here. For a complete list of internal data types, see [].
+We only list the user-facing subset of data types here. 
+<!-- For a complete list of internal data types, see []. -->
 
 User-facing data types:
 
@@ -33,16 +33,14 @@ Functions:
 -   `(negate char_set) => CharSet`: negate takes one CharSet and returns a CharSet that contains all characters not in the input CharSet and doesn't contain any characters from the input CharSet.
 -   ``
 
-## Installation
+## Installation and Compilation
+Requires ghc 8.6.1.
 
-Notes as I try to update Haskell
-
--   blockarguments requires ghc 8.6.1
--   existentialquantification: 6.8.1
--   Can install
+- Install [stack](https://docs.haskellstack.org/en/stable/README/).
+- `$ stack install parsec`
+- `$ ghc -package parsec -o risp ./Main.hs`
 
 ## Usage
-
 1. Read one command from the comand line:
 
     ```bash
@@ -81,7 +79,6 @@ Notes as I try to update Haskell
     ```
 
 ## Benefits:
-
 -   Use meaningful words instead of ambiguous symbols (eg `at_least_1_time` instead of `+`).
     This helps distinguish between symbols as text to match and symbols as operators.
 -   Reveal the structure of the regular expression via parentheses/[s-expressions](https://en.wikipedia.org/wiki/S-expression).
