@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+-- {-# LANGUAGE OverloadedStrings #-}
 -- {-# OPTIONS_GHC -Wno-deferred-type-errors #-}
 {-# LANGUAGE ExistentialQuantification #-}
 import Risp
@@ -12,6 +13,8 @@ import System.IO
 import System.Environment
 import Control.Monad.State
 import Data.Map (empty)
+import Data.Text (strip, pack, unpack)
+import Data.Char
 
 -- Flush result through IO
 flushStr :: String -> IO ()
@@ -25,10 +28,13 @@ evalAndPrint risp oldEnvStack  = do
     -- print risp
     case risp of
         List [Atom "load", String path] -> do
-            exprList <- readFile path
-            print exprList
+            exprListText <- readFile path
+            let stripedText = strip (pack exprListText)
+            print stripedText
+            print exprListText
             -- parseEvalAndPrint exprList oldEnvStack
-            let eitherRispList = readExprList exprList
+            let eitherRispList = readExprList (unpack stripedText)
+            print eitherRispList
             case eitherRispList of 
                 Right rispList -> foldM (flip evalAndPrint) oldEnvStack rispList
                 Left err -> do
@@ -53,12 +59,15 @@ evalAndPrint risp oldEnvStack  = do
                             return newEnvStack
 parseEvalAndPrint :: String -> EnvStack -> IO EnvStack
 parseEvalAndPrint expr oldEnvStack  =
-    case readExpr expr of
-        Right risp -> do
-            evalAndPrint risp oldEnvStack
-        Left err -> do
-            print err
-            return oldEnvStack
+    if all isSpace expr
+    then return oldEnvStack
+    else
+        case readExpr expr of
+            Right risp -> do
+                evalAndPrint risp oldEnvStack
+            Left err -> do
+                print err
+                return oldEnvStack
             
 
 
